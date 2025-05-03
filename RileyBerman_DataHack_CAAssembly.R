@@ -1,3 +1,8 @@
+#Contributor: Riley Berman 
+#Description: Created a tibble containing all the names of the members of the California State Assembly (79 members, 1 vacancy) 
+#along with their party affiliation, district, date they assumed office, counties represented, committees they are on, and their twitter handle. 
+#Methodology: Web scraping from a few webpages and compiled the information into one big tibble.  
+
 library(tidyverse)
 library(rvest)
 library(janitor)
