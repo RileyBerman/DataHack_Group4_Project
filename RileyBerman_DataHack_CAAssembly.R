@@ -1,7 +1,6 @@
 library(tidyverse)
 library(rvest)
 library(janitor)
-library(fuzzyjoin)
 
 link <- "https://ballotpedia.org/California_State_Assembly"
 
