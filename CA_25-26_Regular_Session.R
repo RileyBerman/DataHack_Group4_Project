@@ -22,7 +22,5 @@ merged_df <- left_join(merged_data, bill_info, by = "bill_id")
 #final merged info with bill number, status, title, sponsors' name, party affiliations
 Merged_info <- merged_df %>%  select(bill_number, status_desc, title, name, party, role, url, state_link)
 
-#changing the name of the column 
-names(Merged_info)[names(Merged_info) == "name"] <- "sponsors"
 
 #We would have to analyze the sponsors' party affiliations for each bill to identify if it's bipartisan?
