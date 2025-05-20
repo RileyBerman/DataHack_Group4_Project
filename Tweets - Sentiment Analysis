@@ -1,0 +1,44 @@
+#Contributor: Min Kim
+
+#Description: Created a table containing politicians' usernames, tweets, date of the tweets
+#             and the sentiment (score and direction) of the tweets. 
+
+#Methodolgy: The sentiment is calculated using the analyzeSentiment function from the SentimentAnalysis package.
+#             The sentiment score is then converted to a direction (positive, negative, neutral) using the convertToDirection function.
+
+
+rm(list = ls())
+
+# Install and load the necessary packages
+#install.packages("SentimentAnalysis")
+#install.packages("SnowballC")
+#install.packages("tidyverse")
+library(SentimentAnalysis)
+library(SnowballC)
+library(tidyverse)
+library(readr)
+
+# Load the data
+california_politicians_tweets_FIXED <- read_csv("C:/Users/mkim1/Downloads/california_politicians_tweets_FIXED.csv")
+View(california_politicians_tweets_FIXED)
+
+# isolate the content column
+content <- california_politicians_tweets_FIXED$content
+
+# sentiment analysis using analyzeSentiment function
+sentiment <- analyzeSentiment(content)
+sentiment$SentimentQDAP
+# Convert the sentiment scores to a direction (positive, negative, neutral) & turn it into a tibble
+sentiment_direction <- tibble(convertToDirection(sentiment$SentimentQDAP))
+
+# Create a data frame with the tweets and their sentiment
+tweets_df <- data.frame(content = content, sentiment = sentiment$SentimentQDAP, sentiment_direction = sentiment_direction)
+
+# Create a new column in the original data frame with the sentiment direction
+tweets <- unique(left_join(california_politicians_tweets_FIXED, tweets_df, by = "content")) 
+
+#Rename the last column to Sentiment Direction
+colnames(tweets)[ncol(tweets)] <- "Sentiment Direction"
+
+write.csv(tweets, file = "Tweets_Sentiment_Analysis.csv")
+
