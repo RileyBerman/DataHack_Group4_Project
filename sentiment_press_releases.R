@@ -19,7 +19,7 @@ library(tidyverse)
 library(readr)
 
 # Load the data
-press_releases <- read_csv("all_11_press_releases.csv")
+press_releases <- read_csv("press_releases.csv")
 View(press_releases)
 
 # isolate the content column
@@ -42,3 +42,39 @@ colnames(press_releases)[ncol(press_releases )] <- "Sentiment Direction"
 
 write.csv(press_releases, file = "Press_Release_Sentiment_Analysis.csv")
 write_csv(press_releases, "/Users/sasha/Desktop/Press_Release_Sentiment_Analysis.csv")
+
+
+press_releases |>
+  group_by(party, `Sentiment Direction`) |>
+  summarise(count = n()) |>
+  pivot_wider(names_from = `Sentiment Direction`, values_from = count, values_fill = 0)
+
+press_releases |>
+  group_by(party, `Sentiment Direction`) |>
+  summarise(n = n(), .groups = "drop") |>
+  group_by(party) |>
+  mutate(percent = round(100 * n / sum(n), 1)) |>
+  select(party, `Sentiment Direction`, percent) |>
+  pivot_wider(
+    names_from = `Sentiment Direction`,
+    values_from = percent,
+    values_fill = 0
+  )
+
+press_releases |>
+  group_by(party) |>
+  summarise(
+    avg_sentiment = mean(sentiment, na.rm = TRUE),
+    sd_sentiment = sd(sentiment, na.rm = TRUE),
+    count = n()
+  )
+
+press_releases |>
+  mutate(month = lubridate::floor_date(date, "month")) |>
+  group_by(month) |>
+  summarise(avg_sentiment = mean(sentiment, na.rm = TRUE)) |>
+  ggplot(aes(x = month, y = avg_sentiment)) +
+  geom_line() +
+  labs(title = "Average Sentiment Over Time", x = "Month", y = "Sentiment Score")
+
+
