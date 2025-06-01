@@ -1,4 +1,4 @@
-6#Contributor: Riley Berman 
+#Contributor: Riley Berman 
 #Description: Created a tibble containing the party platform statements of parties (mostly Democratic and Republican) from 1840 to 2024, 
 #             along with the year, party, electoral votes, and number of words in the statement.
 #             Outputted results as a .csv file in a created folder called "Party_Platform_Combined". 
