@@ -5,7 +5,7 @@ editor_options:
 ---
 
 **Objective:** Web scrape information about all current California State
-Assembymembers. Save output as a .csv file.
+Assemblymembers. Save output as a .csv file. Use `CA_Assembly.Rproj` to run files. 
 
 **Files:**
 

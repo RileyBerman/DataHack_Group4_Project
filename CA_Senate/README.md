@@ -5,7 +5,7 @@ editor_options:
 ---
 
 **Objective:** Web scrape information about all current California State
-Senators. Save output as a .csv file.
+Senators. Save output as a .csv file. Use `CA_Senate.Rproj` to run files. 
 
 **Files:**
 
