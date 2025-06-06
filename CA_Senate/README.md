@@ -14,6 +14,6 @@ Senators. Save output as a .csv file. Use `CA_Senate.Rproj` to run files.
     relevant information. Outputs `CA_State_Final` as a .csv file to the
     folder `CA_State_Combined`.
 
--   `CA_State_Combined` : Contains `CA_State_Final.csv` and
+-   `CA_State_Combined` : Folder containing `CA_State_Final.csv` and
     `CA_State_Final_Updated.csv`, which is an updated version of the
     former with a complete list of twitter handles.
