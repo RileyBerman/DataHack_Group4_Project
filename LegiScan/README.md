@@ -5,19 +5,20 @@ editor_options:
 ---
 
 **Objective:** Retrieve all available information about the political
-activity of California's legislators from
-[LegiScan](https://legiscan.com/) using it's API.
+activity of California's legislators from [LegiScan](https://legiscan.com/) using it's API. 
+Use `LegiScan.Rproj` to run files. 
 
 **Files:**
 
--   `RileyBerman_LegiScan_API.py`: Retrieves data sets from the LegiScan
+-   `RileyBerman_LegiScan_API.py`: Retrieves datasets from the LegiScan
     API relating to the political activity of California's legislators,
     including but not limited to a bill's voters, sponsors, and history
     and politicians' information from the 2009-2010 to the 2025-2026
     Regular Session.
 
-    -   This is a Python file. It uses my *personal API key*. Please use
-        `RileyBerman_LegiScan_API_Redacted` for replication purposes.
+    -   This is a Python file. It uses my *personal API key*. It is not available
+    on the GitHub repository. Please use `RileyBerman_LegiScan_API_Redacted.py` for
+    replication purposes with your own personal LegiScan API key. 
 
     -   Outputs results to LegiScan folder as a folder named `CA` (which
         is renamed `LegiScan_CA`). Within this folder are many
@@ -28,7 +29,7 @@ activity of California's legislators from
 -   `RileyBerman_LegiScan_API_Redacted.py` : Copy of
     `RileyBerman_LegiScan_API.py`. Use for replication purposes.
 
--   `LegiScan_API_User_Manual.pdf`: LegiScan official documentation for
+-   `LegiScan_API_User_Manual.pdf`: LegiScan's official documentation for
     their API.
 
 -   `LegiScan_CA`: Renamed folder of `CA` obtained from
@@ -57,14 +58,16 @@ activity of California's legislators from
     5.  `votes_rollcalls_sponsors_bills_combined:`all the votes,
         rollcalls, sponsors, and bills .csv files combined.
 
--   `RileyBerman_LegiScan_Analysis.R`: Performs preliminary analysis on
-    the .csv files in `LegiScan_CA_Combined`.
+-   `RileyBerman_LegiScan_Analysis.R`: Performs analysis on
+    the .csv files in `LegiScan_CA_Combined`. Outputs presentation graphs to `Graphs` folder. 
 
 -   `RileyBerman_PartyProportions.R`: Retrieves Democratic, Republican,
     and Independent party counts through web scraping. Sourced in
     `RileyBerman_LegiScan_Analysis.R`.
+    
+-   `Graphs:` Folder containing presentation graphs from
+    `RileyBerman_LegiScan_Analysis.R`. 
 
 -   `RileyBerman_LegiScan_Analysis2.R`: Continues the analysis of
     `RileyBerman_LegiScan_Analysis.R`. Sources `RileyBerman_LegiScan_Analysis.R`.
-    Produces `bills_statistics_final.csv` and `bills_statistics_final_year.csv` to be 
-    copied over to the Twitter project.
+    Produces `bills_statistics_final.csv` to be copied over to the Twitter project.

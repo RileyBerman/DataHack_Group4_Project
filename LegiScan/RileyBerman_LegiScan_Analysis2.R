@@ -182,4 +182,3 @@ weighted_bills_bipartisan3 <- bills_statistics_updated |>
   scale_color_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
 
 write_csv(bills_statistics_final, "bills_statistics_final.csv")
-write_csv(bills_statistics_final, "bills_statistics_final_year.csv")
