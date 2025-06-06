@@ -160,6 +160,19 @@ print(compound_by_senator)
 
 
 #------Word Frequency Analysis
+words_to_remove <- c("california", "state", "legislature", "legislator", "assembly", "senate",
+                     "assemblymember", "district", "san", "sacramento", "fax", "county", "tel",
+                     "box", "santa", "californians", "assemblywoman", "assemblyman", "phone",
+                     "office", "capitol", "people", "bill", "ramos", "includes", "berman", "curry",
+                     "including", "valley", "time", "million", "bills", "contact", "street",
+                     "alanis", "oceanside", "patterson", "crows" ,"north", "suite", "dixon", "juan",
+                     "newport", "folsom", "hoover", "hilmar", "keyes", "stevinson", "newman", "davies",
+                     "ceres", "gustine", "josh", "diane", "tenth", "macarthur", "boerner", "ash", "laguna",
+                     "grayson", "landing", "addis", "jose", "kalra", "marc", "james", "bernardino", "rocklin",
+                     "blvd", "aguiar", "turlock", "grande", "oaks", "joe", "palo", "alto", "democratic",
+                     "step", "vista", "beach", "schiavo", "ballico", "denair", "highland", "diablo", "boulevard",
+                     "capistrano", "modesto", "napa", "park")
+pattern <- paste0("^(", paste(words_to_remove, collapse = "|"), ")$")
 
 # Get the most common words in the press releases and the count of their usage
 press_data_words <- press_data %>%
