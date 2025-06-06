@@ -1,6 +1,8 @@
 #Contributor: Riley Berman 
 #Description: Retrieves datasets containing all bills, votes, and people information for every specified session available in California. Outputs a folder containing all such files in .csv format. 
 #Methodology: Using operations (getDataList and getDataset) documented in the LegiScan API https://legiscan.com/legiscan, interacts with the API to retrieve relevant datasets. 
+#Note: My personal API key has been redacted for security reasons. This is a Python file. Run this through something like Visual Studio Code. 
+#      A user wishing to replicate my own results needs to make their own API key through LegiScan. 
 
 import requests
 import zipfile

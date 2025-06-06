@@ -1,6 +1,6 @@
 #Contributor: Riley Berman 
 #Description: Manipulates bills_SB_AB_bipartisanship from RileyBerman_LegiScan_Analysis.R to obtain bipartisan stats for each politician.
-#             Output: bills_statistics_final
+#             Output: bills_statistics_final, bills_statistics_final_year
 #Methodology: Tidyverse manipulating and graphing with ggplot2.
 
 rm(list = ls())
@@ -77,35 +77,52 @@ bills_statistics_final <- bills_statistics_updated |>
             total_bills = sum(bills_per_session, na.rm = TRUE),
             .by = people_name_sponsors)
 
+#In case we want to keep the session_year data
+bills_statistics_final_year <- bills_statistics_updated |>
+  summarize(bipartisan_rate1 = mean(bipartisan_rate1, na.rm = TRUE), 
+            bipartisan_rate2 = mean(bipartisan_rate2, na.rm = TRUE),
+            weighted_bipartisan_rate2 = mean(weighted_bipartisan_rate2, na.rm = TRUE),
+            bipartisan_rate3 = mean(bipartisan_rate3, na.rm = TRUE),
+            weighted_bipartisan_rate3 = mean(weighted_bipartisan_rate3, na.rm = TRUE), 
+            bills_sponsored = sum(bills_sponsored, na.rm = TRUE),
+            introduced_num = sum(introduced_num, na.rm = TRUE),
+            passed_num = sum(passed_num, na.rm = TRUE),
+            failed_num = sum(failed_num, na.rm = TRUE),
+            vetoed_num = sum(vetoed_num, na.rm = TRUE),
+            engrossed_num = sum(engrossed_num, na.rm = TRUE),
+            enrolled_num = sum(enrolled_num, na.rm = TRUE),
+            total_bills = sum(bills_per_session, na.rm = TRUE),
+            .by = c(people_name_sponsors, session_year))
+
 #Is Bipartisanship Good? 
 #(Source: https://batten.virginia.edu/bipartisanship-secret-sauce-effective-lawmaking-despite-rising-polarization-congress)
 
 #bipartisan1 by Party
-#Note: Lots of Republican politicians have higher counts of bipartisanship1 (easier to collaborate)
+#Note: Lots of Republican politicians have higher bipartisanship1 rates (easier to collaborate)
 bills_bipartisan1 <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan1_num, color = party)) +
+  ggplot(aes(x = session_year, y = bipartisan_rate1, color = party)) +
   geom_jitter(width = 0.2, alpha = 0.8) +
   labs(title = "Bipartisan1 Bills by Politician and Session Year",
        x = "Session Year",
-       y = "Number of Bipartisan1 Bills") +
+       y = "Rate of Bipartisan1 Bills") +
   theme_ipsum() + 
   scale_color_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
 
 #Boxplot
-#For labeling outliers
-#(Source: https://stackoverflow.com/questions/33524669/labeling-outliers-of-boxplots-in-r)
+#For labeling outliers consider: 
+#https://stackoverflow.com/questions/33524669/labeling-outliers-of-boxplots-in-r
 bills_bipartisan1_boxplot <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan1_num, color = party)) +
+  ggplot(aes(x = session_year, y = bipartisan_rate1, color = party)) +
   geom_boxplot() + 
   labs(title = "Bipartisan1 Bills by Politician and Session Year",
        x = "Session Year",
-       y = "Number of Bipartisan1 Bills") +
+       y = "Rate of Bipartisan1 Bills") +
   theme_ipsum() + 
   scale_color_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
-  
+
 #bipartisan2 by Party
 bills_bipartisan2 <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan2_num, color = party)) + 
+  ggplot(aes(x = session_year, y = bipartisan_rate2, color = party)) + 
   geom_jitter() +
   labs(title = "Bipartisan2 Bills by Politician and Session Year",
        x = "Session Year",
@@ -115,7 +132,7 @@ bills_bipartisan2 <- bills_statistics_updated |>
 
 #Boxplot
 bills_bipartisan2_boxplot <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan2_num, color = party)) +
+  ggplot(aes(x = session_year, y = bipartisan_rate2, color = party)) +
   geom_boxplot() + 
   labs(title = "Bipartisan2 Bills by Politician and Session Year",
        x = "Session Year",
@@ -126,7 +143,7 @@ bills_bipartisan2_boxplot <- bills_statistics_updated |>
 #Weighted
 #Note: Parties are more evenly distributed now 
 bills_weighted_bipartisan2 <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = weighted_bipartisan2_num, color = party)) + 
+  ggplot(aes(x = session_year, y = weighted_bipartisan_rate3, color = party)) + 
   geom_jitter() +
   labs(title = "Weighted Bipartisan2 Bills by Politician and Session Year",
        x = "Session Year",
@@ -136,7 +153,7 @@ bills_weighted_bipartisan2 <- bills_statistics_updated |>
 
 #bipartisan3 by Party
 bills_bipartisan3 <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan3_num, color = party)) + 
+  ggplot(aes(x = session_year, y = bipartisan_rate3, color = party)) + 
   geom_jitter() +
   labs(title = "Bipartisan3 Bills by Politician and Session Year",
        x = "Session Year",
@@ -146,7 +163,7 @@ bills_bipartisan3 <- bills_statistics_updated |>
 
 #Boxplot
 bills_bipartisan3_boxplot <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = bipartisan3_num, color = party)) +
+  ggplot(aes(x = session_year, y = bipartisan_rate3, color = party)) +
   geom_boxplot() + 
   labs(title = "Bipartisan3 Bills by Politician and Session Year",
        x = "Session Year",
@@ -156,10 +173,13 @@ bills_bipartisan3_boxplot <- bills_statistics_updated |>
 
 #Weighted
 weighted_bills_bipartisan3 <- bills_statistics_updated |>
-  ggplot(aes(x = session_year, y = weighted_bipartisan3_num, color = party)) + 
+  ggplot(aes(x = session_year, y = weighted_bipartisan_rate3, color = party)) + 
   geom_jitter() +
   labs(title = "Weighted Bipartisan3 Bills by Politician and Session Year",
        x = "Session Year",
        y = "Average Weighted Bipartisan3 Score") +
   theme_ipsum() + 
   scale_color_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
+
+write_csv(bills_statistics_final, "bills_statistics_final.csv")
+write_csv(bills_statistics_final, "bills_statistics_final_year.csv")

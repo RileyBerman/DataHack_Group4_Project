@@ -9,6 +9,10 @@ library(janitor)
 library(ggplot2)
 library(hrbrthemes)
 library(tidylog)
+library(scales)
+library(knitr)
+library(kableExtra)
+library(webshot2)
 
 # ---- Opening bill data ----
 
@@ -37,9 +41,13 @@ bills <- read_csv("LegiScan_CA_Combined/bills_combined.csv")
 #Separating bill_number into two pieces
 bills_updated <- bills |>
   extract(bill_number, into = c("bill_letter", "bill_numbers"), regex = "([A-Z]+)(\\d+)", remove = FALSE) |>
-  mutate(year = year(status_date)) |>
+  mutate(status_date_year = year(status_date), 
+         last_action_year = year(last_action_date), 
+         session_year = str_extract(folder, "\\d{4}-\\d{4}")) |>
+  select(-folder) |>
   #Let's drop the 2025 bills, since they are not fully recorded yet
-  filter(year < 2025)
+  filter(status_date_year < 2025) |>
+  filter(session_year != "2025-2026") 
 
 #Frequency of Bills by Type
 #Note: Majority are Assembly Bills (AB) and Senate Bills (SB) ~ 90%!
@@ -62,7 +70,7 @@ bill_type_frequency <- bills_updated |>
 bill_type_frequency_year <- bills_updated |> 
   ggplot(aes(x = bill_letter)) + 
   geom_bar() +
-  facet_wrap(~year) +
+  facet_wrap(~session_year) +
   labs(title = "Frequency of Bills by Type by Year", 
        x = "Bill Type", 
        y = "Frequency") +
@@ -73,13 +81,12 @@ bill_type_frequency_year <- bills_updated |>
 #Note: Lot of special session bills in 2009, some in 2010, 2016
 special_session_frequency <- bills_updated |> 
   filter(str_detect(bill_letter, "X")) |> 
-  ggplot(aes(x = year)) + 
+  ggplot(aes(x = session_year)) + 
   geom_bar() + 
   labs(title = "Frequency of Special Session Bills by Year", 
-       x = "Year", 
+       x = "Session Year", 
        y = "Frequency") +
-  theme_minimal() + 
-  scale_x_continuous(breaks = seq(min(bills_updated$year), max(bills_updated$year), by = 2))
+  theme_minimal() 
 
 #Separate "X" from the bill_number and filter for just SB and AB bills
 bills_SB_AB <- bills_updated |>
@@ -89,29 +96,78 @@ bills_SB_AB <- bills_updated |>
 #Source: https://calmatters.org/politics/2024/12/california-assembly-bill-limit/
 #Limitations on introducing bills from 50 to 35 in the Assembly and from 40 to 35 in the senate in the two-year legislative period.
 
-#What about the frequency of AB + SB bills?
+#What about the frequency (political activity) of AB + SB bills?
+#Note: We use the status_date_year column which gives the most recent year of a bill's status
 #Note: 2014 has a very low amount of AB + SB bills
 #Note: SB and AB bill frequency move with each other 
 #Note: Up-and-down yearly cyclical pattern from 2015 to 2024
 #Note: Makes sense for biennial California legislature--lawmakers introduce bills in first odd-numbered years, 
 #then work on them in even-numbered years (they also campaign in even-numbered years)
+#Note: Looking at months, it appears the early and late months are the most productive
 SB_AB_bill_frequency <- bills_SB_AB |> 
   summarize(count = n(), 
-            .by = c(bill_letter, year)) |>
-  ggplot(aes(x = year, y = count, color = bill_letter)) + 
+            .by = c(bill_letter, status_date_year)) |>
+  ggplot(aes(x = status_date_year, y = count, color = bill_letter)) + 
   geom_line() + 
   geom_point(alpha = 0.9) + 
-  labs(title = "Frequency of AB and SB Bills by Year", 
+  labs(title = "Frequency of Senate and Assembly Bills",
+       subtitle = "Senate and Assembly Bills are Cyclical!",
        x = "Year", 
        y = "Frequency") +
   theme_minimal() + 
-  scale_x_continuous(breaks = seq(min(bills_SB_AB$year), max(bills_SB_AB$year), by = 2))
+  scale_x_continuous(breaks = seq(min(bills_SB_AB$status_date_year), max(bills_SB_AB$status_date_year), by = 2)) + 
+  theme_ipsum() 
+
+#Graph for Presentation
+#Note: Used last_action_year instead, makes more sense for measuring political activity
+#Note: It makes sense to thus look at session_year rather than individual years
+peak_bills <- bills_SB_AB |> 
+  summarize(count = n(), .by = c(bill_letter, last_action_date)) |> 
+  filter(count >= quantile(count, 0.99)) 
+
+SB_AB_bill_frequency_final <- bills_SB_AB |> 
+  summarize(count = n(), .by = c(bill_letter, last_action_date)) |> 
+  ggplot(aes(x = last_action_date, y = count, color = bill_letter)) + 
+  geom_text(data = peak_bills, 
+            aes(x = last_action_date, y = count, 
+                label = lubridate::month(last_action_date, label = TRUE)),
+            size = 3.5, vjust = -0.5, check_overlap = TRUE) + 
+  geom_line(size = 1.2, alpha = 0.5) + 
+  geom_point(size = 2.5, alpha = 0.5) + 
+  scale_color_manual(
+    values = c("SB" = "#1f77b4", "AB" = "#ff7f0e"),
+    name = "Bill Type") +
+  labs(title = "Legislative Bill Activity by Year",
+       subtitle = "Senate and Assembly activity follow the biennial session cycle",
+       x = "Date", 
+       y = "Number of Bills",
+       caption = "Bill activity refers to the most recent date on which action was taken on the bill\n Data: LegiScan") +
+  scale_x_date(date_breaks = "2 years",
+               date_labels = "%Y",
+               expand = expansion(mult = c(0.01, 0.01))) + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold"),
+        panel.grid.minor = element_blank(), 
+        legend.title = element_text(size = 12),
+        legend.position = c(0.02, 1), 
+        legend.justification = c("left", "top"),
+        legend.direction = "horizontal", 
+        legend.title.align = 0,
+        legend.background = element_rect(color = "grey", fill = alpha("white", 0.8)),
+        legend.key.size = unit(0.8, "lines"),
+        legend.spacing.y = unit(0.3, "lines"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12))
 
 #Note: from now on, we will only be looking at AB and SB bills
 
+#Did this already by using the folder name in RileyBerman_LegiScan_Combine.R
 #Because bills are 2-year cyclical, I think it makes sense to analyze bills grouped by their 2-year periods
 #Example: year = 2015, so part of 2015-2016 session
-bills_SB_AB <- bills_SB_AB |> mutate(session_year = ifelse(year %% 2 == 0, paste0(year - 1, "-", year), paste0(year, "-", year + 1)))
+#bills_SB_AB <- bills_SB_AB |> mutate(session_year = ifelse(year %% 2 == 0, paste0(year - 1, "-", year), paste0(year, "-", year + 1)))
 
 #How often do bills pass/fail? 
 #Note: Bit tricky, since some bills die out and are not recorded as "failed" or "passed"--for now, we table this
@@ -129,7 +185,7 @@ bill_status_distribution <- bills_SB_AB |>
   theme_minimal() + 
   scale_color_brewer(palette = "Set1") 
 
-#Let's just look at the bills that are either "Passed," or "Failed"
+#Problem with bills that are either "Passed" or "Failed"
 #Many bills that aren't explicitly labeled as failed will have "failed passage" or "died" in last_action column 
 #Let's count those as failed as well--creating a new column
 bills_SB_AB <- bills_SB_AB |>
@@ -200,10 +256,63 @@ people_updated <- people_updated |>
   filter(people_id == max(people_id, na.rm = TRUE), 
          .by = c(session_year, role, district)) 
 
-#Another problem: it is also the case that sometimes a politician who has ended their tenure is listed in the next session year
-#Example: Susan Eggman ended her tenure in the Assembly by taking over for Cathleen Galgiani in 2020, 
-#so I don't know why Susan is listed here (it should be for the 2021-2022 session_year)
+#Funny behavior: 
+#Example: Susan Eggman ended her tenure in the Assembly by taking over for Cathleen Galgiani in 2020 in the Senate, 
+#         who she had previously replaced in the Assembly in 2012. Similar thing with Ted Gaines and Brian Dahle
 #Both represent district "SD-005"
+#Source: https://en.wikipedia.org/wiki/Susan_Eggman
+#Source: https://en.wikipedia.org/wiki/Cathleen_Galgiani
+
+#Is there a way to quantify this behavior? 
+people_replacements <- people_updated |>
+  arrange(district, role, session_year) |>
+  mutate(previous_person = lag(name),
+         replaced = ifelse(name != previous_person & !is.na(previous_person), TRUE, FALSE), 
+         replace_by = ifelse(name != previous_person & !is.na(previous_person), name, NA), 
+         same_party_replacement = ifelse(replaced == TRUE & party == lag(party), TRUE, FALSE),
+         .by = c(district, role)) |>
+  filter(same_party_replacement == TRUE) |>
+  select(district, previous_person, replace_by, role, session_year)
+
+people_double_replacements <- people_replacements |>
+  count(previous_person, replace_by, name = "times_replaced") |>
+  filter(times_replaced > 1)
+
+#Table for Presentation
+#Double Replacement Chains in the California Legislature
+people_double_replacements_final <- people_double_replacements |>
+  left_join(people_replacements, by = c("previous_person", "replace_by")) |>
+  arrange(previous_person, replace_by, session_year) |>
+  rename(Incumbent = previous_person,
+         Replacement = replace_by,
+         `Role Progression` = role,
+         `Session Year` = session_year) |>
+  mutate(`Role Progression` = ifelse(`Role Progression` == "Rep", "Assembly", "Senate")) |>
+  arrange(`Session Year`) |>
+  summarize(Incumbent = first(Incumbent), 
+            Replacement = first(Replacement), 
+            `Role Progression` = paste(`Role Progression`, collapse = " to "), 
+            `Session Year` = paste(`Session Year`, collapse = ", "), 
+            .by = c(Incumbent, Replacement)) |>
+  kbl(booktabs = TRUE) |>
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover", "condensed"),
+                html_font = "Helvetica",
+                font_size = 13) |>
+  row_spec(0, bold = TRUE, background = "#e6f0ff") |>  
+  add_header_above(c(" " = 4)) |>  
+  footnote(general = "Data: LegiScan", general_title = "", 
+           footnote_as_chunk = TRUE, 
+           escape = FALSE)
+
+#Save styled table as HTML
+save_kable(people_double_replacements_final, file = "Graphs/people_double_replacements_final.html")
+
+#Convert to PNG using webshot
+webshot("Graphs/people_double_replacements_final.html", file = "Graphs/people_double_replacements_final.png", zoom = 3, vwidth = 1200, delay = 0.2)
+
+
+#Note: There are sometimes more or less than 120 total members (special appointments, deaths, vacancies, etc.)
 DR_proportion <- people |>
   summarize(total_republicans = sum(party == "R", na.rm = TRUE), 
             total_democrats = sum(party == "D", na.rm = TRUE), 
@@ -214,6 +323,10 @@ DR_proportion <- people |>
 
 #Because of this, I will locate and source this information from an outside source
 source("RileyBerman_PartyProportions.R", local = TRUE)
+
+#Make sure the session_year is arranged by chronological order
+senate_assembly_count_table <- senate_assembly_count_table |>
+  arrange(session_year)
 
 #Graphing
 #Note: Democrat proportion has been higher than Republican proportion and increasing in recent years
@@ -233,10 +346,62 @@ DR_proportion_plot <- senate_assembly_count_table |>
   theme_ipsum() + 
   theme(legend.position = "bottom") + 
   facet_wrap(~role) + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+#Graph for Presentation
+every_other_session <- function(x){
+    x <- sort(unique(x))
+    x[seq(2, length(x), 2)] <- ""
+    x
+}
+
+latest_points <- senate_assembly_count_table |>
+  filter(session_year == max(session_year)) |>
+  select(session_year, democrat_percentage, republican_percentage)
+
+DR_proportion_plot_final <- senate_assembly_count_table |>
+  mutate(role = ifelse(role == "Rep", "Assembly", "Senate")) |>
+  ggplot(aes(x = session_year)) + 
+  scale_y_continuous(labels = percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.1))) +
+  scale_x_discrete(breaks = every_other_session(senate_assembly_count_table$session_year)) +
+  geom_vline(xintercept = "2009-2010", linetype = "dashed", color = "darkgrey", size = 0.5) + 
+  geom_text(aes(x = "2001-2002", y = 0.80, label = "LegiScan starts"), 
+            vjust = -0.5, nudge_x = 0.3, color = "darkgrey", size = 3) + 
+  geom_line(aes(y = democrat_percentage, color = "Democrat"), size = 1.2, alpha = 0.9, group = 1) +
+  geom_point(aes(y = democrat_percentage, color = "Democrat"), size = 2.5, alpha = 0.9) +
+  geom_line(aes(y = republican_percentage, color = "Republican"), size = 1.2, alpha = 0.9, group = 1) +
+  geom_point(aes(y = republican_percentage, color = "Republican"), size = 2.5, alpha = 0.9) +
+  scale_color_manual(values = c("Democrat" = "#357EDD", "Republican" = "#E63946"),  
+                     name = "Party") +
+  labs(title = "Party Composition by Session Year",
+       subtitle = "Proportion of Democrats and Republicans in the California Legislature",
+       x = "Session Year",
+       y = "Proportion",
+    caption = "Independents' proportion excluded (<3%)\n Data: Ballotpedia") +
+  facet_wrap(~role) +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+        legend.position = "top", 
+        legend.direction = "horizontal", 
+        legend.justification = "left", 
+        legend.margin = margin(t = -5),           
+        legend.box.margin = margin(b = -5), 
+        legend.title = element_text(size = 12), 
+        strip.text = element_text(size = 13)) + 
+  geom_text(data = latest_points, aes(x = session_year, y = democrat_percentage, 
+            label = scales::percent(democrat_percentage, accuracy = 1), 
+            color = "black"), vjust = 1.6, nudge_x = -0.35, size = 3.5, show.legend = FALSE) +
+  geom_text(data = latest_points, aes(x = session_year, y = republican_percentage,
+            label = scales::percent(republican_percentage, accuracy = 1),
+            color = "black"), vjust = -1.25, nudge_x = -0.35, size = 3.5, show.legend = FALSE) 
 
 # ---- Back to bill data (bipartisanship) ----
-
 #How are bipartisan bills doing?
 #There are many ways to define and score bipartisan bills--and more complicated ones (ex: https://www.thelugarcenter.org/ourwork-43.html)
 #Through sponsorship... 
@@ -246,8 +411,10 @@ DR_proportion_plot <- senate_assembly_count_table |>
 #Consider maybe using Shannon Diversity Index, but there are really only 2 types of party sponsorship
 #(Source: https://en.wikipedia.org/wiki/Diversity_index)
 #Note: There are 3 types of sponsors: D (Democrat), R (Republican), I (Independent)
-#Note: Only 63 bills out of 38,860 have an independent sponsor (Chad Mayes, 2021-2022 Regular Session) -- let's just exclude them 
+#Note: Only 63 bills out of 36,535 have an independent sponsor (Chad Mayes, 2021-2022 Regular Session) -- let's just exclude them 
 #bills_SB_AB |> filter(str_detect(party_sponsors, "I")) |> nrow()
+
+#There is a larger discrepancy here because 1,146 have sponsors that are committes (e.g., "Budget and Fiscal Review")
 bills_SB_AB_updated <- bills_SB_AB |> filter(!str_detect(party_sponsors, "I"))
 
 #To access weighted measures, merge bills_SB_AB_updated with senate_assembly_year (has no role column and independents)
@@ -312,6 +479,69 @@ bipartisan_count <- bills_SB_AB_bipartisanship |>
   scale_color_brewer(palette = "Set1") + 
   theme_ipsum()
 
+#Graph for Presentation
+#How much did the proportion for bipartisan1 and weighted bipartisan2 change from 2009-2010 to 2023-2024
+#Note: Around -2.9% for bipartisan1, -5.5% for weighted bipartisan2
+#Note: Not insignificant, around 150 and 260 less bipartisan bills, respectively 
+differences <- bills_SB_AB_bipartisanship |>
+  summarize(bill_count = n(), 
+            average_bipartisan1 = mean(bipartisan1, na.rm = TRUE), 
+            weighted_average_bipartisan2 = mean(weighted_bipartisan2, na.rm = TRUE),
+            .by = session_year) |>
+  arrange(session_year) |>
+  mutate(absolute_difference1 = (last(average_bipartisan1) * last(bill_count)) - (first(average_bipartisan1) * first(bill_count)),
+         absolute_difference2 = (last(weighted_average_bipartisan2) * last(bill_count)) - (first(weighted_average_bipartisan2) * first(bill_count)),
+         difference1 = last(average_bipartisan1) - first(average_bipartisan1), 
+         difference2 = last(weighted_average_bipartisan2) - first(weighted_average_bipartisan2)) |>
+  distinct(absolute_difference1, absolute_difference2, difference1, difference2)
+
+bipartisan_count_final <- bills_SB_AB_bipartisanship |>
+  summarize(average_bipartisan1 = mean(bipartisan1, na.rm = TRUE), 
+            weighted_average_bipartisan2 = mean(weighted_bipartisan2, na.rm = TRUE),
+            .by = session_year) |>
+  ggplot(aes(x = session_year)) +
+  geom_line(aes(y = average_bipartisan1, color = "Bipartisan1"), 
+            size = 1.2, group = 1) +
+  geom_line(aes(y = weighted_average_bipartisan2, color = "Weighted Bipartisan2"), 
+            size = 1.2, group = 1, alpha = 0.85) +
+  scale_color_manual(values = c("Bipartisan1" = "#009E73",    
+                                "Weighted Bipartisan2" = "#E69F00")) +
+  scale_y_continuous(limit = c(0.025, 0.1525), expand = expansion(mult = c(0, 0.05))) +
+  labs(title = "Bipartisanship Share by Session Year",
+       subtitle = "Historical decrease in bipartisanship",
+       x = "Session Year",
+       y = "Annual Share of Bills",
+       caption = "Data: LegiScan") +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold"),  
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        legend.position = "top", 
+        legend.direction = "horizontal", 
+        legend.justification = "left", 
+        legend.margin = margin(t = -5),           
+        legend.box.margin = margin(b = -5), 
+        legend.title = element_blank())
+
+#How many bills per year? 
+#Bill activity has stayed fairly consistent 
+bills_year <- bills_SB_AB_bipartisanship |> summarize(bills = n(), 
+                                        .by = session_year) |>
+  ggplot(aes(x = session_year, y = bills)) +
+  geom_bar(stat = "identity", fill = "#F8766D") + 
+  labs(title = "Number of Bills by Session Year", 
+       x = "Session Year", 
+       y = "Number of Bills") + 
+  theme_ipsum() 
+
+#Average: ~4405
+bills_year_average <- bills_SB_AB_bipartisanship |> 
+  summarize(bills = n(), .by = session_year) |> 
+  pull(bills) |> mean(na.rm = TRUE)
+
 #What percentage of bills are bipartisan?
 #Note: Around 12.3% for bipartisan1 and 9% for bipartisan2
 bipartisan_statistics <- bills_SB_AB_bipartisanship |>
@@ -338,17 +568,69 @@ bipartisan3_score <- bills_SB_AB_bipartisanship |>
   scale_y_continuous(limits = c(0, 1)) +
   theme_ipsum()
 
+#Graph for Presentation
+bipartisan3_score_table <- bills_SB_AB_bipartisanship |>
+  filter(bipartisan3 > 0) |>
+  summarize(average_bipartisan3 = mean(bipartisan3, na.rm = TRUE), 
+            weighted_average_bipartisan3 = mean(weighted_bipartisan3, na.rm = TRUE),
+            .by = session_year) 
+
+#How much did bipartisan change from 2009-2010 to 2023-2024?
+#Note: Decrease of -0.0637 (average) and -0.141 (weighted average) points
+#Note: Equivalently, decrease of around 6 and 1.5 bipartisan3 points 
+bipartisan3_score_difference <- bipartisan3_score_table |>
+  arrange(session_year) |>
+  mutate(difference1 = last(average_bipartisan3) - first(average_bipartisan3), 
+         difference2 = last(weighted_average_bipartisan3) - first(weighted_average_bipartisan3)) |>
+  distinct(difference1, difference2)
+
+bipartisan3_score_final <- bipartisan3_score_table |>
+  ggplot(aes(x = session_year)) + 
+  geom_line(aes(y = weighted_average_bipartisan3, color = "Weighted Average"), size = 1.2, group = 1, alpha = 0.6) +
+  geom_line(aes(y = average_bipartisan3, color = "Average"), size = 1.2, group = 1, alpha = 0.6) + 
+  scale_color_manual(values = c("Weighted Average" = "#009E73", 
+                                "Average" = "#D55E00")) +
+  scale_y_continuous(limits = c(0.40, 0.6)) + 
+  labs(title = "Bipartisanship3 by Session Year", 
+       subtitle = "Historical decrease in bipartisanship",
+       x = "Session Year", 
+       y = "Annual Bipartisanship3 Score",
+       caption = "1.0 = equal support from both parties, 0 = fully partisan\n Data: LegiScan") +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+        panel.grid.minor = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.justification = "left",
+        legend.margin = margin(t = -5),
+        legend.box.margin = margin(b = -5),
+        legend.title = element_blank())
+
+#Graph for Presentation 
 #Histogram
 #Note: Obviously vast majority have score of 0 so we remove them 
 #Note: Peaks at 1 and 0.50 imply equal party or 2:1 ratios are the most popular
-bipartisan3_histogram <- bills_SB_AB_bipartisanship |>
+bipartisan3_histogram_final <- bills_SB_AB_bipartisanship |>
   filter(bipartisan3 > 0) |>
   ggplot(aes(x = bipartisan3)) + 
-  geom_histogram(bins = 30, fill = "#F8766D", color = "black") +
-  labs(title = "Bipartisanship3 Score Histogram", 
-       x = "Bipartisanship3 Score", 
-       y = "Count") + 
-  theme_ipsum()
+  geom_histogram(bins = 30, fill = "#F8766D", color = "black", alpha = 0.85) +
+  labs(title = "Distribution of Bipartisan3",
+       subtitle = "Bipartisanship mostly occurs in 2:1 or equal party ratios",
+       x = "Bipartisan3", 
+       y = "Number of Bills",
+       caption = "1.0 = equal support from both parties, 0.5 = 2:1 ratio\n Fully partisan (bipartisan3 = 0) bills excluded\n Data: LegiScan") + 
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text = element_text(size = 11),
+        panel.grid.minor = element_blank())
 
 #Weighted
 #Note: More evenly distributed, still peaks at close to 0.6
@@ -380,26 +662,53 @@ fully_partisan <- bills_SB_AB_bipartisanship |> filter(minority_sponsors == 0) |
   theme_ipsum() + 
   scale_fill_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
 
+#Has the number of fully partisan bills increased? 
+#Note: Not really 
+fully_partisan_table <- bills_SB_AB_bipartisanship |> 
+  mutate(total_bills = n(), 
+            .by = session_year) |>
+  filter(minority_sponsors == 0) |>
+  summarize(total_fully_partisan = n(), 
+            proportion = total_fully_partisan/total_bills,
+            .by = session_year) |>
+  distinct(session_year, .keep_all = TRUE) 
+
+#For Presentation
 #Weighted
 #Note: For the most part, when weighted, both sides sponsor fully partisan bills equally 
-fully_partisan_weighted <- bills_SB_AB_bipartisanship |> filter(minority_sponsors == 0) |>
+fully_partisan_weighted_final <- bills_SB_AB_bipartisanship |> 
+  filter(minority_sponsors == 0) |>
   mutate(party_partisanship = ifelse(republican_sponsors > democrat_sponsors, "R", "D")) |>
   summarize(count = n(),
             republican_percentage = first(republican_percentage), 
             democrat_percentage = first(democrat_percentage),
             .by = c(party_partisanship, session_year)) |>
   mutate(weighted_count = ifelse(party_partisanship == "R", 
-                             count/republican_percentage, 
-                             count/democrat_percentage)) |>
+                                 count/republican_percentage, 
+                                 count/democrat_percentage)) |>
   ggplot(aes(x = session_year, y = weighted_count, fill = party_partisanship)) +
-  geom_bar(stat = "identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = "Proportion of Fully (Weighted) Partisan Bills by Party and Session Year", 
-       x = "Session Year", 
-       y = "Proportion of Fully (Weighted) Partisan Bills",
-       fill = "Party") + 
-  theme_ipsum() + 
-  scale_fill_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
+  geom_bar(stat = "identity", position = "fill", alpha = 0.9, color = "white") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(values = c("D" = "blue", "R" = "red"), 
+                    labels = c("D" = "Democrat", "R" = "Republican")) +
+  labs(title = "Share of Fully Partisan Bills Weighted by Party",
+       subtitle = "Not a one-party issue",
+       x = "Session Year", y = "Proportion",
+       fill = "Party", caption = "Fully partisan bill = all sponsors belong to the same party\n Data: LegiScan") +
+  theme_ipsum(base_family = "Helvetica", base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+        legend.position = "top", 
+        legend.direction = "horizontal", 
+        legend.justification = "left", 
+        legend.margin = margin(t = -5),           
+        legend.box.margin = margin(b = -5), 
+        legend.title = element_text(size = 12))
 
 #Do Republicans sponsor more bills than Democrats?
 #Note: Democrats sponsor more bills than Republicans (unsurprising, given Democratic majority in California)
@@ -448,6 +757,26 @@ bipartisanship_majority <- bills_SB_AB_bipartisanship |> filter(minority_sponsor
   theme_ipsum() + 
   scale_fill_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
 
+#What about when bipartisan3 is really low/high? 
+#Note: While bipartisan3 < 0.5 has not decreased too much, 
+#      bipartisan3 > 0.5 has decreased significantly
+#Note: This means that politicians' are moving towards working in less even ratios, 
+#      thus decreasing the bipartisan3 score
+bipartisanship_majority <- bills_SB_AB_bipartisanship |> 
+  filter(bipartisan3 > 0) |>
+  mutate(ind = ifelse(bipartisan3 > 0.5, TRUE, FALSE)) |>
+  ggplot(aes(x = session_year)) + 
+  geom_bar(stat = "count") + 
+  facet_wrap(~ind)
+
+#Weighted
+bipartisanship_majority <- bills_SB_AB_bipartisanship |> 
+  filter(weighted_bipartisan3 > 0) |>
+  mutate(ind = ifelse(weighted_bipartisan3 > 0.5, TRUE, FALSE)) |>
+  ggplot(aes(x = session_year)) + 
+  geom_bar(stat = "count") + 
+  facet_wrap(~ind)
+
 #Weighted
 #Note: Looks like Republicans are sponsoring more party-majority bills in recent years (almost half)
 bipartisanship_majority_weighted <- bills_SB_AB_bipartisanship |> filter(minority_sponsors != 0) |>
@@ -469,3 +798,18 @@ bipartisanship_majority_weighted <- bills_SB_AB_bipartisanship |> filter(minorit
   theme_ipsum() + 
   scale_fill_manual(values = c("D" = "#00BFC4", "R" = "#F8766D"))
 
+#Save all final plots 
+#I have also added people_double_replacements_final to this folder
+dir.create("Graphs", showWarnings = FALSE) 
+
+for (plot_name in ls(pattern = "_final$")){
+  plot_obj <- get(plot_name)
+  if (inherits(plot_obj, "ggplot")){
+    ggsave(filename = paste0("Graphs/", plot_name, ".png"), 
+           plot = get(plot_name), 
+           width = 8,
+           height = 5,
+           dpi = 300, 
+           bg = "white")
+  }
+}

@@ -5,10 +5,12 @@
 rm(list = ls())
 
 library(tidyverse)
+library(kableExtra)
 library(janitor)
+library(webshot2)
+
 #VADER (Valence Aware Dictionary and sEntiment Reasoner) was originally developed in Python.
 #This is an R port of the original Python package.
-
 #Source: https://cran.r-project.org/web/packages/vader/vader.pdf
 library(vader)
 
@@ -34,6 +36,8 @@ get_vader("Great day to be alive \U0001F60A")
 
 #Note: "love with a positive score, "hate" with a negative score, and but_count = 1
 get_vader("I love today and I hate tomorrow")
+
+get_vader("No, I am your father")
 
 #Note: when @mentions are included, if the word is neutral it really won't make a difference in the compound score (but, neu will increase)
 get_vader("@SenatorBerman I love today and I hate tomorrow")
@@ -103,6 +107,16 @@ analyzer <- vader$SentimentIntensityAnalyzer()
 #Example
 analyzer$polarity_scores("Great day to be alive")
 
+#For presentation
+test <- tibble(
+  text = c(
+    "I love today and I hate tomorrow",
+    "I love today 😊 and I hate tomorrow",
+    "I love today, but I hate tomorrow!",
+    "I love today, but I really HATE tomorrow!",
+    "I do not love today",
+    "Today is not bad"))
+
 #Does it match up to the R version?
 result2 <- test |>
   mutate(result = map(text, ~ analyzer$polarity_scores(.x))) |>
@@ -111,6 +125,31 @@ result2 <- test |>
          neu = map_dbl(result, "neu"),
          neg = map_dbl(result, "neg")) |>
  select(-result)
+
+#For Presentation
+#Exported to Graphs folder
+result2_final <- result2 |>
+  rename(Text = text,
+         Compound = compound,
+         Positive = pos,
+         Neutral = neu,
+         Negative = neg) |>
+    kbl(booktabs = TRUE) |>
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover", "condensed"),
+                html_font = "Helvetica",
+                font_size = 13) |>
+  row_spec(0, bold = TRUE, background = "#e6f0ff") |>  
+  add_header_above(c(" " = 5)) |>  
+  footnote(general = "Sentiment Analysis: VADER", general_title = "", 
+           footnote_as_chunk = TRUE, 
+           escape = FALSE)
+
+#Save styled table as HTML
+save_kable(result2_final, file = "Graphs/VADER_sample_temp.html")
+
+#Convert to PNG using webshot
+webshot("Graphs/VADER_sample_temp.html", file = "Graphs/VADER_sample.png", zoom = 3, vwidth = 1200, delay = 0.2)
 
 #Check how the results match up
 #Note: looks like the Python version picks up the emoji's!
